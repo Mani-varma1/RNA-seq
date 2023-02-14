@@ -5,14 +5,14 @@
 ##############################   BUILD  DOWNLOAD   ####################################
 #######################################################################################
 
-# Build the mouse genome from gencode build
+# Downlaod the mouse ref genome and GTF from gencode for creating index
 REFLNK=https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_mouse/release_M32/GRCm39.primary_assembly.genome.fa.gz
 GTFLNK=https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_mouse/release_M32/gencode.vM32.primary_assembly.annotation.gtf.gz
-BUILDDIR=~/Desktop/nf_tut/rna_seq/mus_rna/output/gencode_build # path for output dir of assembly
+BUILDDIR=~/Desktop/rna_seq/mus_rna/output/gencode_build # path for output dir of assembly
 
-# Use wget to get to download ref genome and annotation file for building index
-#wget ${REFLNK} -P ${BUILDDIR}
-#wget ${GTFLNK} -P ${BUILDDIR}
+# Use wget to get to download the files
+wget ${REFLNK} -P ${BUILDDIR}
+wget ${GTFLNK} -P ${BUILDDIR}
 
 
 
@@ -22,13 +22,13 @@ BUILDDIR=~/Desktop/nf_tut/rna_seq/mus_rna/output/gencode_build # path for output
 ###################################   READS  DOWNLOAD   ################################
 ########################################################################################
 
-#Get the reads for p53+/- mice with radiation vs control
+# Get the reads for p53+/- mice with radiation vs control
 
-SRAPATH=~/Desktop/nf_tut/rna_seq/mus_rna/input/SraRunTable.txt
-# GET the SRR list just for the samples needed for investigation
+SRAPATH=~/Desktop/rna_seq/mus_rna/input/SraRunTable.txt # downloaded from (https://trace.ncbi.nlm.nih.gov/Traces/study/?acc=SRP061386&o=acc_s%3Aa)
+
+# GET the SRR accession list just for the samples needed for rna seq analysis
 VAR=$(tail -n +2 ${SRAPATH} | grep "[^-]B cells from spleen" | grep "RNA-Seq" |cut -d ',' -f 1)
 READSDIR=~/Desktop/nf_tut/rna_seq/mus_rna/output/reads
-
 
 
 : '
@@ -53,7 +53,7 @@ for i in ${VAR}
 '
 
 # Large dataset so this is just the first 250k reads for each file instead to accomedate for the low system resources
-#cat ~/Desktop/nf_tut/rna_seq/mus_rna/input/SRA_list.txt | parallel wget {} -P ${READSDIR}
+cat ~/Desktop/nf_tut/rna_seq/mus_rna/input/SRA_list.txt | parallel wget {} -P ${READSDIR}
 
 
 
@@ -64,17 +64,18 @@ for i in ${VAR}
 
 #For looking at  pre trimmed quality check and filetering
 # PRE QC check
-QCOUT=~/Desktop/nf_tut/rna_seq/mus_rna/output/results/fastqc
-#fastqc -t 8 ${READSDIR}/*fastq.gz -o ${QCOUT} && multiqc ${QCOUT} -o ${QCOUT}
+QCOUT=~/Desktop/rna_seq/mus_rna/output/results/fastqc
+fastqc -t 8 ${READSDIR}/*fastq.gz -o ${QCOUT} && multiqc ${QCOUT} -o ${QCOUT}
 
 
 
 # No adaptor contamination found but using it for demonstration purposes
 #Using the provided illumina adaptor sequence to remove potential contaminations 
-ADPATH=~/miniconda3/envs/nexflo/share/trimmomatic-0.39-2/adapters/TruSeq3-PE-2.fa
+ADPATH=~/miniconda3/envs/nexflo/share/trimmomatic-0.39-2/adapters/TruSeq3-PE-2.fa 
 printf '%s\n' "${VAR[@]}" | \
 	parallel -j 2 "trimmomatic PE -threads 4 ${READSDIR}/{}_1.fastq.gz ${READSDIR}/{}_2.fastq.gz" \
 	"-baseout ${READSDIR}/trREADS/{}.fastq ILLUMINACLIP:${ADPATH}:2:30:10:2:keepBothReads MINLEN:35 2>${READSDIR}/trREADS/{}trimming.log"
+
 
 #POST QC check
 multiqc ${READSDIR}/trREADS/ -o ${QCOUT}/trREADS/
